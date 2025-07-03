@@ -20,13 +20,13 @@ jobs:
           sudo apt install -y git curl repo build-essential bc bison flex libssl-dev \
             libelf-dev python3 python3-pip unzip zip rsync libncurses-dev lld
 
-      - name: Create and Init GKI Source
+      - name: Init
         run: |
           mkdir gki && cd gki
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android12-5.10
           repo sync -c --no-tags --no-clone-bundle --optimized-fetch
 
-      - name: Delete Line 2 in build.config.gki
+      - name: clean
         run: |
           sed -i '2d' gki/common/build.config.gki
 
@@ -52,7 +52,7 @@ jobs:
           git rm --cached sus || true
           git add KernelSU
           git add sus
-          git commit -m "Fix KernelSU & sus state after setup.sh injection" || true
+          git commit -m "KSU fix" || true
 
       - name: Set Kernel EXTRAVERSION and Disable Localversion Script
         run: |
