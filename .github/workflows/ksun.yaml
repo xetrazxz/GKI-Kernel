@@ -1,0 +1,80 @@
+name: KernelSU + SUSFS Build - 12.5.209
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Free up space
+        uses: AdityaGarg8/remove-unwanted-software@v5
+        with:
+          remove-dotnet: true
+          remove-haskell: true
+          remove-android: true
+          remove-codeql: true
+          remove-docker-images: true
+          remove-swapfile: true
+
+      - name: Install deps
+        run: sudo apt update && sudo apt install -y ccache curl git bc bison flex
+
+      - name: Install repo
+        run: |
+          curl -o repo https://storage.googleapis.com/git-repo-downloads/repo
+          chmod +x repo
+          sudo mv repo /usr/local/bin/repo
+
+      - name: Init + sync kernel
+        run: |
+          mkdir kernel
+          cd kernel
+          repo init -u https://android.googlesource.com/kernel/manifest \
+            -b common-android12-5.10-2024-05
+          repo sync -c -j$(nproc)
+
+      - name: Add KernelSU
+        run: |
+          cd kernel
+          curl -LSs https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh | bash
+
+      - name: Add SUSFS patch
+        run: |
+          cd kernel
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git
+          cp susfs4ksu/kernel_patches/50_add_susfs_in_gki-android12-5.10.patch common/
+          cd common
+          patch -p1 < 50_add_susfs_in_gki-android12-5.10.patch
+
+      - name: Apply defconfig changes
+        run: |
+          cd kernel
+          echo "CONFIG_KSU=y" >> common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS=y" >> common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_TMPFS_XATTR=y" >> common/arch/arm64/configs/gki_defconfig
+
+      - name: Build with GKI build.sh
+        run: |
+          cd kernel
+          LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 \
+            build/build.sh CC="ccache clang"
+
+      - name: Package
+        run: |
+          git clone https://github.com/WildPlusKernel/AnyKernel3.git
+          cp kernel/out/android12-5.10/dist/Image AnyKernel3/
+          cd AnyKernel3
+          zip -r KernelSU-SUSFS-12.5.209.zip ./*
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: KernelSU-SUSFS-12.5.209
+          path: AnyKernel3/KernelSU-SUSFS-12.5.209.zip
