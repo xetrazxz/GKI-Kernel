@@ -370,9 +370,9 @@ jobs:
             sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-${{ inputs.kernelsu_variant }}-v$KSUVER-SUSFS-v1.5.9-Wild\"/" ./common/arch/arm64/configs/gki_defconfig
           fi
           
-      - name: Append CONFIG_HZ_300 and CONFIG_HZ=300 to defconfig
+      - name: Set CONFIG_HZ
         run: |
-          echo -e '\nCONFIG_HZ_300=y\nCONFIG_HZ=300' >> ./common/arch/arm64/configs/gki_defconfig
+          echo -e 'CONFIG_HZ_300=y\nCONFIG_HZ=300' >> ./common/arch/arm64/configs/gki_defconfig
 
 
       - name: Build
