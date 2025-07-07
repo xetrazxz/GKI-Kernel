@@ -369,9 +369,6 @@ jobs:
             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
             sed -E -i "/^CONFIG_LOCALVERSION=/ s/(.*)\"/\\1-${{ inputs.kernelsu_variant }}-v$KSUVER-SUSFS-v1.5.9-Wild\"/" ./common/arch/arm64/configs/gki_defconfig
           fi
-          
-      
-
 
       - name: Build
         run : |
@@ -400,7 +397,7 @@ jobs:
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
 
-                
+      
       - name: Compress all img files with gzip
         run: |
           for image in *.img; do
