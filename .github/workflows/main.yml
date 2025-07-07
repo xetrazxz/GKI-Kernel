@@ -76,8 +76,8 @@ jobs:
       fail-fast: true
       matrix: ${{ fromJson(needs.set-matrix.outputs.matrix) }}
     with:
-      # kernelsu_variant: ${{ matrix.kernelsu_variant }}
-      # kernelsu_branch: ${{ inputs.kernelsu_branch }}
-      # kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
+      kernelsu_variant: ${{ matrix.kernelsu_variant }}
+      kernelsu_branch: ${{ inputs.kernelsu_branch }}
+      kernelsu_branch_other: ${{ inputs.kernelsu_branch_other }}
 
   
