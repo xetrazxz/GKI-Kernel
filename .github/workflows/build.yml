@@ -114,9 +114,9 @@ jobs:
           ANYKERNEL_BRANCH="gki-2.0"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
           echo "Using branch for AnyKernel3: $ANYKERNEL_BRANCH"
-          
+          echo "Using branch for SUSFS: $SUSFS_BRANCH"
           git clone https://github.com/WildPlusKernel/AnyKernel3.git -b "$ANYKERNEL_BRANCH"
-          
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
           git clone https://github.com/WildPlusKernel/kernel_patches.git
 
       - name: Check Disk Space Before Sync
@@ -190,7 +190,57 @@ jobs:
               ;;
           esac
           
-      
+      - name: Apply SUSFS Patches for KernelSU Variants
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+          
+          echo "Applying SUSFS patches..."
+          
+          # Copy SUSFS patches
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cd common
+          patch -p1 --forward --fuzz=3 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch
+          cd ..
+          cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+          cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+          
+          case "${{ inputs.kernelsu_variant }}" in
+            "WILD")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./Wild_KSU
+              ;;
+            "KSU")
+              echo "Applying SUSFS patches for Official KernelSU..."
+              cd ./KernelSU
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch
+              ;;
+            "NEXT")
+              echo "Applying SUSFS patches for KernelSU Next..."
+              cd ./KernelSU-Next
+              cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
+              patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || true
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_apk_sign.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_apk_sign.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_core_hook.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_core_hook.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_selinux.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_selinux.c.patch
+              
+              cp ../../kernel_patches/next/susfs_fix_patches/v1.5.9/fix_ksud.c.patch ./
+              patch -p1 --forward --fuzz=3 < fix_ksud.c.patch
+              
+              ;;
+            "MKSU")
+              echo "Applying SUSFS patches for MKSU..."
+              cd ./KernelS
+              ;;
+          esac
+
       - name: Getting KernelSU Version
         run: |
           echo "Changing to configuration directory: $CONFIG..."
@@ -198,7 +248,7 @@ jobs:
           
           case "${{ inputs.kernelsu_variant }}" in
             "WILD")
-              
+              echo "Applying SUSFS patches for Official KernelSU..."
               cd ./Wild_KSU
               BASE_VERSION=10200
               ;;
@@ -274,26 +324,54 @@ jobs:
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      
+      - name: Add SUSFS Configuration Settings
+        run: |
+          echo "Changing to configuration directory: $CONFIG..."
+          cd "$CONFIG"
+
+          # Add SUSFS configuration settings
+          echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
+
+          if [ "${{ inputs.kernelsu_variant }}" == "NEXT" ] || [ "${{ inputs.kernelsu_variant }}" == "WILD" ]; then
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/gki_defconfig
+          else
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> ./common/arch/arm64/configs/gki_defconfig
+          fi
 
       - name: Change Kernel Name
         run: |
           cd "$CONFIG"
 
-          # modify UTS_VERSION
-          perl -pi -e 's{UTS_VERSION="\$\(echo \$UTS_VERSION \$CONFIG_FLAGS \$TIMESTAMP \| cut -b -\$UTS_LEN\)"}{UTS_VERSION="#1 SMP PREEMPT Sun Apr 20 04:20:00 UTC 2025"}' ./common/scripts/mkcompile_h
+          echo "" > ./common/scripts/setlocalversion
           
-          sed -i '$s|echo "\$res"|echo "\$res-${{ inputs.kernelsu_variant }}-v$KSUVER-SUSFS-v1.5.7-Wild"|' ./common/scripts/setlocalversion
-          if [ -f "build/build.sh" ]; then
-            sed -i 's/-dirty//' ./common/scripts/setlocalversion
+          chmod +x ./common/scripts/setlocalversion
+          
+          # Update or append EXTRAVERSION
+          if grep -q '^EXTRAVERSION *=' Makefile; then
+            sed -i 's/^EXTRAVERSION *=.*/EXTRAVERSION = -Xenophobic-KSUN/' Makefile
           else
-            sed -i 's/build-timestamp = $(or $(KBUILD_BUILD_TIMESTAMP), $(build-timestamp-auto))/build-timestamp = "Sun Apr 20 04:20:00 UTC 2025"/' ./common/init/Makefile
-            sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' ./common/BUILD.bazel
-            rm -rf ./common/android/abi_gki_protected_exports_*
-            sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
-            sed -i '/^CONFIG_LOCALVERSION=/c\CONFIG_LOCALVERSION="kernel-test"' ./common/arch/arm64/configs/gki_defconfig
+            echo 'EXTRAVERSION = -Xenophobic-KSUN' >> Makefile
           fi
 
+      - name: Append CONFIG_HZ_300 and CONFIG_HZ=300 to defconfig
+        run: |
+          echo -e '\nCONFIG_HZ_300=y\nCONFIG_HZ=300' >> common/arch/arm64/configs/gki_defconfig
+      
+      
       - name: Build
         run : |
           set -e
@@ -314,17 +392,52 @@ jobs:
 
           echo "Creating bootimgs folder and copying images..."
           cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./bootimgs
-          
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./bootimgs
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image ./
+          cp ./$CONFIG/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image.lz4 ./
+
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
 
-      
+      - name: Create Bootimgs Folder and Copy Images for Android 14/15
+        if: ${{ inputs.android_version == 'android14' || inputs.android_version == 'android15' }}
+        run: |
+          mkdir bootimgs
 
-      
-          
+          echo "Creating bootimgs folder and copying images..."
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./bootimgs
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./bootimgs
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image ./
+          cp ./$CONFIG/bazel-bin/common/kernel_aarch64/Image.lz4 ./
+
           # Create gzip of the Image file
           gzip -n -k -f -9 ./Image > ./Image.gz
-                    
+
+      - name: Create ZIP Files for Different Formats
+        run: |
+          echo "Creating zip files for all formats..."
+          cd ./AnyKernel3
+          
+          # Create and upload zip for each format
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image ./Image
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image
+          
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-lz4.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image.lz4 ./Image.lz4
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image.lz4
+          
+          ZIP_NAME="${{ inputs.kernelsu_variant }}-$KSUVER-${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3-gz.zip"
+          echo "Creating zip file: $ZIP_NAME..."
+          mv ../Image.gz ./Image.gz
+          zip -r "../$ZIP_NAME" ./*
+          rm ./Image.gz
+
+      
       - name: Compress all img files with gzip
         run: |
           for image in *.img; do
