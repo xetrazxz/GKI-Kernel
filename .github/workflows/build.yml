@@ -372,7 +372,7 @@ jobs:
           
       - name: Set CONFIG_HZ
         run: |
-          echo -e 'CONFIG_HZ_300=y\nCONFIG_HZ=300' >> ./common/arch/arm64/configs/gki_defconfig
+          echo -e 'CONFIG_HZ_300=y\nCONFIG_HZ=300' >> /home/runner/work/GKI-Kernel/GKI-Kernel/common/arch/arm64/configs/gki_defconfig
 
 
       - name: Build
