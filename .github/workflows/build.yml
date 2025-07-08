@@ -398,11 +398,7 @@ jobs:
           gzip -n -k -f -9 ./Image > ./Image.gz
 
       
-      - name: Compress all img files with gzip
-        run: |
-          for image in *.img; do
-            gzip -vnf9 "$image"
-          done
+      
   
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
