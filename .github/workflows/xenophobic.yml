@@ -1,8 +1,8 @@
-name: Build GKI
+name: Build GKI Aetherium2.1
 
 on:
   workflow_dispatch:
-  
+
 jobs:
   build:
     name: Build Kernel
@@ -11,8 +11,8 @@ jobs:
     steps:
       - name: Setup git identity
         run: |
-          git config --global user.name "xetrazxz"
-          git config --global user.email "xetrazx@gmail.com"
+          git config --global user.name "kaminari"
+          git config --global user.email "itawanri14@gmail.com"
 
       - name: Install Dependencies
         run: |
@@ -20,7 +20,7 @@ jobs:
           sudo apt install -y git curl repo build-essential bc bison flex libssl-dev \
             libelf-dev python3 python3-pip unzip zip rsync libncurses-dev lld
 
-      - name: Init GKI Source
+      - name: Create and Init GKI Source
         run: |
           mkdir gki && cd gki
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android12-5.10
@@ -81,13 +81,8 @@ jobs:
         run: |
           cd gki
           LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
-          
-      - name: Keep only Image file
-        run: |
-          cd gki/out/android12-5.10/dist
-          find . ! -name 'Image' -type f -delete
 
-     - name: Upload kernel artifacts
+      - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: xenophobic-kernel
